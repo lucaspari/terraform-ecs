@@ -72,6 +72,23 @@ resource "aws_ecs_task_definition" "demo_task_definition" {
     },
   ])
 }
+resource "aws_security_group" "lb_sg" {
+  vpc_id = var.defaultvpc
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 resource "aws_security_group" "example" {
   vpc_id = var.defaultvpc
 
@@ -100,8 +117,48 @@ resource "aws_ecs_service" "demo_ecs_service" {
     security_groups  = [aws_security_group.example.id]
     assign_public_ip = true
   }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.demo_tg.arn
+    container_name   = "springboot-service"
+    container_port   = 8080
+  }
 }
 resource "aws_cloudwatch_log_group" "demo_log_group" {
   name              = "/ecs/springboot-service"
   retention_in_days = 1
 }
+resource "aws_alb" "demo_load_balancer" {
+  name               = "demoalb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = [for net in var.subnet : net]
+}
+resource "aws_lb_target_group" "demo_tg" {
+  name        = "demo-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = var.defaultvpc
+  target_type = "ip"
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+    matcher             = "200-299"
+  }
+}
+resource "aws_lb_listener" "demo_listener" {
+  load_balancer_arn = aws_alb.demo_load_balancer.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.demo_tg.arn
+  }
+}
+
+
