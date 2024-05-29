@@ -61,6 +61,47 @@ resource "aws_ecs_task_definition" "demo_task_definition" {
           hostPort      = 8080
         }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/springboot-service"
+          "awslogs-region"        = "sa-east-1"
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
     },
   ])
+}
+resource "aws_security_group" "example" {
+  vpc_id = var.defaultvpc
+
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_ecs_service" "demo_ecs_service" {
+  name            = "ecs_springboot_service"
+  cluster         = aws_ecs_cluster.demo_ecs_cluster.id
+  task_definition = aws_ecs_task_definition.demo_task_definition.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+  network_configuration {
+    subnets          = [for net in var.subnet : net]
+    security_groups  = [aws_security_group.example.id]
+    assign_public_ip = true
+  }
+}
+resource "aws_cloudwatch_log_group" "demo_log_group" {
+  name              = "/ecs/springboot-service"
+  retention_in_days = 1
 }
