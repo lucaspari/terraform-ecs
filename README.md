@@ -33,7 +33,8 @@ The setup includes:
 ```bash
 terraform init
 ```
-3. **Configure variables based on your VPC and subnet in the variable.tf file**:
+3. **Configure variables based on your VPC and subnet in the variable.tf file**
+
 4. **Apply Terraform configuration**:
 
 ```bash
